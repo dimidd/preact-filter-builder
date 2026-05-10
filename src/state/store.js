@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals';
+import { formatSequentialGroupId } from '../lib/groupIds.js';
 
 /**
  * Create a new filter store with Preact Signals.
@@ -46,7 +47,7 @@ export function createFilterStore(schema = []) {
      * :returns: Next available group ID string
      */
     function getNextGroupId() {
-        const id = `group-${groupCounter.value}`;
+        const id = formatSequentialGroupId(groupCounter.value);
         groupCounter.value++;
         return id;
     }

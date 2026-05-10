@@ -1,5 +1,6 @@
 import { html } from 'htm/preact';
 import { exportFiltersAsJson, importFiltersFromJson } from '../lib/filterSerializer.js';
+import { parseSequentialGroupNumericSuffix, SEQUENTIAL_GROUP_ID_PREFIX } from '../lib/groupIds.js';
 import { FilterGroup } from './FilterGroup.js';
 
 /**
@@ -10,6 +11,7 @@ import { FilterGroup } from './FilterGroup.js';
  * @param {object} store - Filter store from useFilterState
  * @param {(filters: object[], rootGroup: object, groups: Record<string, object>) => void} [onChange] - Optional change callback
  * @returns {void}
+ * @throws {Error} When imported nested group keys are not canonical `group-<n>` ids or disagree with `group.id`
  */
 function applyImportedFiltersToStore(result, store, onChange) {
     const clonedFilters = result.filters.map(f => ({ ...f }));
@@ -25,22 +27,39 @@ function applyImportedFiltersToStore(result, store, onChange) {
         };
     }
 
+    const invalidGroupKeys = [];
+    const groupNumericSuffixes = [];
+    for (const key of Object.keys(clonedGroups)) {
+        const group = clonedGroups[key];
+        if (group.id !== key) {
+            throw new Error(
+                `Imported groups map is inconsistent: key ${JSON.stringify(key)} does not match group.id ${JSON.stringify(group.id)}.`
+            );
+        }
+        const n = parseSequentialGroupNumericSuffix(key);
+        if (n === null) {
+            invalidGroupKeys.push(key);
+        } else {
+            groupNumericSuffixes.push(n);
+        }
+    }
+    if (invalidGroupKeys.length > 0) {
+        throw new Error(
+            `Cannot import nested groups: expected ids like "${SEQUENTIAL_GROUP_ID_PREFIX}0". ` +
+                `Unrecognized id(s): ${invalidGroupKeys.map(k => JSON.stringify(k)).join(', ')}`
+        );
+    }
+
     if (clonedFilters.length > 0) {
         const maxFilterId = Math.max(...clonedFilters.map(f => f.id));
         if (maxFilterId >= store.filterCounter.value) {
             store.filterCounter.value = maxFilterId + 1;
         }
     }
-    if (Object.keys(clonedGroups).length > 0) {
-        const groupIds = Object.keys(clonedGroups).map(id => {
-            const match = id.match(/^group-(\d+)$/);
-            return match ? parseInt(match[1], 10) : -1;
-        }).filter(id => id >= 0);
-        if (groupIds.length > 0) {
-            const maxGroupId = Math.max(...groupIds);
-            if (maxGroupId >= store.groupCounter.value) {
-                store.groupCounter.value = maxGroupId + 1;
-            }
+    if (groupNumericSuffixes.length > 0) {
+        const maxGroupSuffix = Math.max(...groupNumericSuffixes);
+        if (maxGroupSuffix >= store.groupCounter.value) {
+            store.groupCounter.value = maxGroupSuffix + 1;
         }
     }
 
