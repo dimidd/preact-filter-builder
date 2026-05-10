@@ -3,6 +3,57 @@ import { exportFiltersAsJson, importFiltersFromJson } from '../lib/filterSeriali
 import { FilterGroup } from './FilterGroup.js';
 
 /**
+ * Apply parsed import data to the reactive store: clone for new references,
+ * advance ID counters past imported IDs, assign store values, and notify.
+ *
+ * @param {{ filters: object[], rootGroup: object, groups: Record<string, object> }} result - Parsed import from importFiltersFromJson
+ * @param {object} store - Filter store from useFilterState
+ * @param {(filters: object[], rootGroup: object, groups: Record<string, object>) => void} [onChange] - Optional change callback
+ * @returns {void}
+ */
+function applyImportedFiltersToStore(result, store, onChange) {
+    const clonedFilters = result.filters.map(f => ({ ...f }));
+    const clonedRootGroup = {
+        ...result.rootGroup,
+        items: result.rootGroup.items.map(item => ({ ...item }))
+    };
+    const clonedGroups = {};
+    for (const [key, group] of Object.entries(result.groups)) {
+        clonedGroups[key] = {
+            ...group,
+            items: group.items.map(item => ({ ...item }))
+        };
+    }
+
+    if (clonedFilters.length > 0) {
+        const maxFilterId = Math.max(...clonedFilters.map(f => f.id));
+        if (maxFilterId >= store.filterCounter.value) {
+            store.filterCounter.value = maxFilterId + 1;
+        }
+    }
+    if (Object.keys(clonedGroups).length > 0) {
+        const groupIds = Object.keys(clonedGroups).map(id => {
+            const match = id.match(/^group-(\d+)$/);
+            return match ? parseInt(match[1], 10) : -1;
+        }).filter(id => id >= 0);
+        if (groupIds.length > 0) {
+            const maxGroupId = Math.max(...groupIds);
+            if (maxGroupId >= store.groupCounter.value) {
+                store.groupCounter.value = maxGroupId + 1;
+            }
+        }
+    }
+
+    store.filters.value = clonedFilters;
+    store.rootGroup.value = clonedRootGroup;
+    store.groups.value = clonedGroups;
+
+    if (onChange) {
+        onChange(clonedFilters, clonedRootGroup, clonedGroups);
+    }
+}
+
+/**
  * Filter builder container component.
  * 
  * Provides the main UI for building complex filter expressions with
@@ -75,48 +126,7 @@ export function FilterBuilder({
                         store.getNextFilterId,
                         store.getNextGroupId
                     );
-
-                    // Deep clone to ensure reactivity - create new object references
-                    const clonedFilters = result.filters.map(f => ({ ...f }));
-                    const clonedRootGroup = {
-                        ...result.rootGroup,
-                        items: result.rootGroup.items.map(item => ({ ...item }))
-                    };
-                    const clonedGroups = {};
-                    for (const [key, group] of Object.entries(result.groups)) {
-                        clonedGroups[key] = {
-                            ...group,
-                            items: group.items.map(item => ({ ...item }))
-                        };
-                    }
-
-                    // Update counters to be higher than any imported IDs
-                    if (clonedFilters.length > 0) {
-                        const maxFilterId = Math.max(...clonedFilters.map(f => f.id));
-                        if (maxFilterId >= store.filterCounter.value) {
-                            store.filterCounter.value = maxFilterId + 1;
-                        }
-                    }
-                    if (Object.keys(clonedGroups).length > 0) {
-                        const groupIds = Object.keys(clonedGroups).map(id => {
-                            const match = id.match(/^group-(\d+)$/);
-                            return match ? parseInt(match[1], 10) : -1;
-                        }).filter(id => id >= 0);
-                        if (groupIds.length > 0) {
-                            const maxGroupId = Math.max(...groupIds);
-                            if (maxGroupId >= store.groupCounter.value) {
-                                store.groupCounter.value = maxGroupId + 1;
-                            }
-                        }
-                    }
-
-                    store.filters.value = clonedFilters;
-                    store.rootGroup.value = clonedRootGroup;
-                    store.groups.value = clonedGroups;
-
-                    if (onChange) {
-                        onChange(clonedFilters, clonedRootGroup, clonedGroups);
-                    }
+                    applyImportedFiltersToStore(result, store, onChange);
                     alert('Filters imported successfully!');
                 } catch (error) {
                     alert('Error importing filters: ' + error.message);
@@ -153,48 +163,7 @@ export function FilterBuilder({
                     store.getNextFilterId,
                     store.getNextGroupId
                 );
-
-                // Deep clone to ensure reactivity - create new object references
-                const clonedFilters = result.filters.map(f => ({ ...f }));
-                const clonedRootGroup = {
-                    ...result.rootGroup,
-                    items: result.rootGroup.items.map(item => ({ ...item }))
-                };
-                const clonedGroups = {};
-                for (const [key, group] of Object.entries(result.groups)) {
-                    clonedGroups[key] = {
-                        ...group,
-                        items: group.items.map(item => ({ ...item }))
-                    };
-                }
-
-                // Update counters to be higher than any imported IDs
-                if (clonedFilters.length > 0) {
-                    const maxFilterId = Math.max(...clonedFilters.map(f => f.id));
-                    if (maxFilterId >= store.filterCounter.value) {
-                        store.filterCounter.value = maxFilterId + 1;
-                    }
-                }
-                if (Object.keys(clonedGroups).length > 0) {
-                    const groupIds = Object.keys(clonedGroups).map(id => {
-                        const match = id.match(/^group-(\d+)$/);
-                        return match ? parseInt(match[1], 10) : -1;
-                    }).filter(id => id >= 0);
-                    if (groupIds.length > 0) {
-                        const maxGroupId = Math.max(...groupIds);
-                        if (maxGroupId >= store.groupCounter.value) {
-                            store.groupCounter.value = maxGroupId + 1;
-                        }
-                    }
-                }
-
-                store.filters.value = clonedFilters;
-                store.rootGroup.value = clonedRootGroup;
-                store.groups.value = clonedGroups;
-
-                if (onChange) {
-                    onChange(clonedFilters, clonedRootGroup, clonedGroups);
-                }
+                applyImportedFiltersToStore(result, store, onChange);
                 alert('Filters imported from clipboard!');
             } catch (error) {
                 alert('Error importing filters: ' + error.message);
