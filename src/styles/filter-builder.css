@@ -276,6 +276,23 @@
     background: #fff5f5;
 }
 
+.fb-filter-row-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fb-spacing-sm);
+}
+
+.fb-schema-warning {
+    margin: 0;
+    padding: var(--fb-spacing-sm) var(--fb-spacing-md);
+    font-size: var(--fb-font-size-sm);
+    color: #842029;
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: var(--fb-border-radius-sm);
+    border-left: 4px solid var(--fb-danger);
+}
+
 /* Filter row */
 .fb-filter-row {
     display: flex;
